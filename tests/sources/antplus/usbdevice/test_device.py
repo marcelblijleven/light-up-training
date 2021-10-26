@@ -16,4 +16,4 @@ def test_usbdevice_open_already_opened(mocker: pytest_mock.MockerFixture, open_u
     with pytest.raises(USBDeviceException) as wrapped_e:
         open_usb_device.open()
 
-    assert 'cannot open USB device, device is already open' in wrapped_e.value
+    assert 'cannot open USB device, device is already open' in str(wrapped_e.value)
