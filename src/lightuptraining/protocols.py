@@ -2,6 +2,14 @@ from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
+class Encodeable(Protocol):
+    """
+    Has a encode method which returns a bytes() object
+    """
+    def encode(self) -> bytes:
+        pass
+
+@runtime_checkable
 class SupportsNotify(Protocol):
     """
     Has a notify method which takes a Dict[str, int] value argument.
