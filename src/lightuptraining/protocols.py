@@ -6,14 +6,17 @@ class Encodeable(Protocol):
     """
     Has a encode method which returns a bytes() object
     """
+
     def encode(self) -> bytes:
         pass
+
 
 @runtime_checkable
 class SupportsNotify(Protocol):
     """
     Has a notify method which takes a Dict[str, int] value argument.
     """
+
     def notify(self, value: dict[str, int]) -> None:
         pass
 
@@ -26,6 +29,7 @@ class IsSource(Protocol):
     The attach_output and remove_output method take a single argument
     which must implement the SupportsNotify protocol
     """
+
     def start(self) -> None:
         pass
 

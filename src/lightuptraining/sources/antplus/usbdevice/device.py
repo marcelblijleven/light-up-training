@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from queue import Queue
 from threading import Lock
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Union
 
 import usb.control
 import usb.core
@@ -29,8 +29,8 @@ class USBDevice:
         self._device: Optional[usb.core.Device] = None
         self._is_open = False
         self._lock = Lock()
-        self._message_queue: Optional[Queue] = None
-        self._usb_read_thread: Optional[USBThread] = None
+        self._message_queue: Queue[Union[int, None]] = Queue()
+        self._usb_read_thread = USBThread(self, self._max_packet_size(), self._message_queue)
         self._configure_device()
 
     def __enter__(self) -> USBDevice:
@@ -46,13 +46,11 @@ class USBDevice:
         """
 
     def __rich__(self) -> str:
-        vendor_id = format(self.vendor_id, '#0x')
-        product_id = format(self.product_id, '#0x')
         return f'[blue]USB device ' \
-               f'[yellow](vendor id: [red]{vendor_id}[/red] product id [red]{self.product_id}[/red])[/yellow])'
+               f'[yellow](vendor id: [red]{self.vendor_id:#0x}[/red] product id [red]{self.product_id:#0x}[/red])[/yellow])'
 
     def __str__(self) -> str:
-        return f'USB device (vendor id: {self.vendor_id} product id {self.product_id})'
+        return f'USB device (vendor id: {self.vendor_id:#0x} product id {self.product_id:#0x})'
 
     @property
     def _device_active_configuration(self) -> Any:
@@ -81,7 +79,7 @@ class USBDevice:
             )
 
         def match_func(e: usb.core.Endpoint) -> bool:
-            return usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN
+            return bool(usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
 
         endpoint = usb.util.find_descriptor(self._device_interface, custom_match=match_func)
 
@@ -107,7 +105,7 @@ class USBDevice:
             )
 
         def match_func(e: usb.core.Endpoint) -> bool:
-            return usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT
+            return bool(usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
 
         endpoint = usb.util.find_descriptor(self._device_interface, custom_match=match_func)
 
@@ -154,7 +152,7 @@ class USBDevice:
             )
 
         cfg = self._device_active_configuration
-        return cfg[(0, 0)].bInterfaceNumber
+        return int(cfg[(0, 0)].bInterfaceNumber)
 
     @property
     def endpoint_in(self) -> usb.core.Endpoint:
@@ -190,7 +188,7 @@ class USBDevice:
                 product_id=self.product_id,
             )
 
-        self._device: usb.core.Device = device
+        self._device = device
         self._device_detach_kernel()
         self._device.set_configuration()
         self._device_claim_interface()
@@ -207,19 +205,18 @@ class USBDevice:
         """
         Detaches the kernel for all interfaces (only on Unix systems)
         """
+        if not self._device:
+            raise USBDeviceException(
+                message='cannot detach kernel, device is not configured',
+                vendor_id=self.vendor_id,
+                product_id=self.product_id,
+            )
+
         for cfg in self._device:
             for interface in cfg:
                 try:
                     if self._device.is_kernel_driver_active(interface.index):
-                        try:
-                            self._device.detach_kernel_driver(interface.index)
-                            logger.debug(f'detached kernel driver for interface {interface.index}')
-                        except usb.core.USBError as e:
-                            raise USBDeviceException(
-                                message=f'failed to detach kernel driver for interface {interface.number}: {e}',
-                                vendor_id=self.vendor_id,
-                                product_id=self.product_id,
-                            )
+                        _detach_kernel(self, self._device, interface)
                 except NotImplementedError:
                     pass  # NotImplementedError is raised on non Unix systems, so it can be ignored
 
@@ -228,6 +225,16 @@ class USBDevice:
         Releases the claimed interface of the currently active configuration
         """
         usb.util.release_interface(self._device, self._device_interface_number)
+
+    def _max_packet_size(self):
+        try:
+            max_packet_size = self._device_endpoint_in.wMaxPacketSize
+            logger.debug(f'max packet size read from device: {max_packet_size:#0x}')
+        except AttributeError:
+            max_packet_size = 0x40
+            logger.debug(f'could not read max packet size from device, using default {max_packet_size:#0x}')
+
+        return max_packet_size
 
     def _read(self, size: int, timeout: Optional[int] = None) -> bytes:
         """
@@ -266,7 +273,7 @@ class USBDevice:
                 product_id=self.product_id,
             )
 
-        return self._device_endpoint_out.write(data, timeout)
+        return int(self._device_endpoint_out.write(data, timeout))
 
     def close(self) -> None:
         """
@@ -283,7 +290,6 @@ class USBDevice:
             self._is_open = False
             self._device_release_interface()
             self._usb_read_thread.stop()
-            self._message_queue = None
             logging.info("usb device closed")
 
     def device_info(self) -> str:
@@ -293,14 +299,15 @@ class USBDevice:
         if not self.is_open:
             return str(self)
 
+        device: usb.core.Device = self._device
         info = [
             str(self),
-            f'product: {self._device.product}',
-            f'manufacturer: {self._device.manufacturer}',
-            f'address: {self._device.address}',
-            f'bus: {self._device.bus}',
-            f'port number: {self._device.port_number}',
-            f'speed: {self._device.speed}',
+            f'product: {device.product}',
+            f'manufacturer: {device.manufacturer}',
+            f'address: {device.address}',
+            f'bus: {device.bus}',
+            f'port number: {device.port_number}',
+            f'speed: {device.speed}',
         ]
 
         return '\n'.join(info)
@@ -316,16 +323,7 @@ class USBDevice:
                 product_id=self.product_id,
             )
 
-        try:
-            max_packet_size = self._device_endpoint_in.wMaxPacketSize
-            logger.debug(f'max packet size read from device: {max_packet_size:#0x}')
-        except AttributeError:
-            max_packet_size = 0x40
-            logger.debug(f'could not read max packet size from device, using default {max_packet_size:#0x}')
-
         with self._lock:
-            self._message_queue = Queue()
-            self._usb_read_thread = USBThread(self, max_packet_size, self._message_queue)
             self._usb_read_thread.start()
             self._is_open = True
             logger.info('USB device opened')
@@ -342,3 +340,15 @@ class USBDevice:
         Writes the encodable message to the USB device and returns the amount of bytes written
         """
         return self._write(message.encode(), timeout)
+
+
+def _detach_kernel(usb_device: USBDevice, device: usb.core.Device, interface: usb.core.Interface):
+    try:
+        device.detach_kernel_driver(interface.index)
+        logger.debug(f'detached kernel driver for interface {interface.index}')
+    except usb.core.USBError as e:
+        raise USBDeviceException(
+            message=f'failed to detach kernel driver for interface {interface.index}: {e}',
+            vendor_id=usb_device.vendor_id,
+            product_id=usb_device.product_id,
+        )
