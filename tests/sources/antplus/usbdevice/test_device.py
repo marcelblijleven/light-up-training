@@ -261,7 +261,7 @@ def test__configure_device(mocker: pytest_mock.MockerFixture):
     mocked_find.assert_called_once()
     mocked_detach_kernel.assert_called_once()
     mocked_claim_interface.assert_called_once()
-    device._device.set_configuration.assert_called_once()  # noqa
+    device._device.set_configuration.assert_called_once()  # type: ignore # noqa
 
 
 def test__device_claim_interface(mocker: pytest_mock.MockerFixture, mocked_usb_device):
