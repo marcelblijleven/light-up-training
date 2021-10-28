@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -68,7 +68,7 @@ def mock_configuration():
 
 
 @pytest.fixture()
-def mocked_usb_device(mocker: pytest_mock.MockerFixture) -> USBDevice:
+def mocked_usb_device(mocker: pytest_mock.MockerFixture) -> Generator[USBDevice, None, None]:
     with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find'):
         with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
                           return_value=MockEndpoint()):
@@ -79,13 +79,13 @@ def mocked_usb_device(mocker: pytest_mock.MockerFixture) -> USBDevice:
 
 
 @pytest.fixture()
-def closed_usb_device(mocked_usb_device) -> USBDevice:
+def closed_usb_device(mocked_usb_device: USBDevice) -> USBDevice:
     mocked_usb_device._is_open = False
     return mocked_usb_device
 
 
 @pytest.fixture()
-def open_usb_device(mocked_usb_device) -> USBDevice:
+def open_usb_device(mocked_usb_device: USBDevice) -> USBDevice:
     mocked_usb_device.open()
-    mocked_usb_device._usb_read_thread.start.assert_called_once()  # noqa
+    mocked_usb_device._usb_read_thread.start.assert_called_once()  # type: ignore # noqa
     return mocked_usb_device
