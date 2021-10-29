@@ -1,9 +1,4 @@
-try:
-    from typing import Protocol, runtime_checkable
-except ImportError:
-    from typing_extensions import Protocol, runtime_checkable
-
-from typing import Dict
+from typing import Dict, Protocol, runtime_checkable
 
 
 @runtime_checkable
