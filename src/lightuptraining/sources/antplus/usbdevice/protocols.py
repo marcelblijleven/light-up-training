@@ -1,5 +1,9 @@
 from abc import abstractmethod
-from typing import Protocol, runtime_checkable
+
+try:
+    from typing import Protocol, runtime_checkable
+except ImportError:
+    from typing_extensions import Protocol, runtime_checkable
 
 import usb
 
