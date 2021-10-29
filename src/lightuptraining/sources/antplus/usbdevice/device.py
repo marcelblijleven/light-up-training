@@ -30,8 +30,8 @@ class USBDevice:
         self._is_open = False
         self._lock = Lock()
         self._message_queue: Queue[Union[int, None]] = Queue()
-        self._usb_read_thread = USBThread(self, self._max_packet_size(), self._message_queue)
         self._configure_device()
+        self._usb_read_thread = USBThread(self, self._max_packet_size(), self._message_queue)
 
     def __enter__(self) -> USBDevice:
         """
