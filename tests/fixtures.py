@@ -69,13 +69,14 @@ def mock_configuration():
 
 @pytest.fixture()
 def mocked_usb_device(mocker: pytest_mock.MockerFixture) -> Generator[USBDevice, None, None]:
-    with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find'):
-        with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
-                          return_value=MockEndpoint()):
-            with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.USBThread',
-                              return_value=MagicMock()):
-                device = USBDevice(0x0001, 0x0002)
-                yield device
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find')
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
+                 return_value=MockEndpoint())
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.USBThread',
+                 return_value=MagicMock())
+
+    device = USBDevice(0x0001, 0x0002)
+    yield device
 
 
 @pytest.fixture()
