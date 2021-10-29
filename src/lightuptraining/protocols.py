@@ -1,4 +1,4 @@
-from typing import Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable, Dict
 
 
 @runtime_checkable
@@ -17,7 +17,7 @@ class SupportsNotify(Protocol):
     Has a notify method which takes a Dict[str, int] value argument.
     """
 
-    def notify(self, value: dict[str, int]) -> None:
+    def notify(self, value: Dict[str, int]) -> None:
         pass
 
 
