@@ -8,9 +8,10 @@ from lightuptraining.sources.antplus.usbdevice.exceptions import USBDeviceExcept
 
 
 def test_init_device_not_found(mocker: pytest_mock.MockerFixture):
-    with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find', return_value=None):
-        with pytest.raises(USBDeviceException) as wrapped_e:
-            USBDevice(0x01, 0x02)
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find', return_value=None)
+
+    with pytest.raises(USBDeviceException) as wrapped_e:
+        USBDevice(0x01, 0x02)
 
     assert 'device not found' in str(wrapped_e.value)
 
@@ -84,25 +85,25 @@ def test__device_active_configuration_device_not_configured(mocked_usb_device):
 
 
 def test__device_endpoint_in(mocker: pytest_mock.MockerFixture, mock_endpoint):
-    with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find'):
-        with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
-                          return_value=mock_endpoint):
-            device = USBDevice(0x01, 0x02)
-            endpoint = device._device_endpoint_in
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find')
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
+                 return_value=None)
 
-            assert endpoint == mock_endpoint
+    device = USBDevice(0x01, 0x02)
+    endpoint = device._device_endpoint_in
+
+    assert endpoint == mock_endpoint
 
 
-def test__device_endpoint_in_no_endpoint_found(mocker: pytest_mock.MockerFixture):
-    with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find'):
-        with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
-                          return_value=None):
-            device = USBDevice(0x01, 0x02)
+def test__device_endpoint_in_no_endpoint_found(mocker: pytest_mock.MockerFixture, mocked_usb_device):
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find')
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
+                 return_value=None)
 
-            with pytest.raises(USBDeviceException) as wrapped_e:
-                _ = device._device_endpoint_in
+    with pytest.raises(USBDeviceException) as wrapped_e:
+        _ = mocked_usb_device._device_endpoint_in
 
-            assert 'could not get endpoint with direction IN' in str(wrapped_e.value)
+    assert 'could not get endpoint with direction IN' in str(wrapped_e.value)
 
 
 def test__device_endpoint_in_device_not_configured(mocked_usb_device):
@@ -115,25 +116,25 @@ def test__device_endpoint_in_device_not_configured(mocked_usb_device):
 
 
 def test__device_endpoint_out(mocker: pytest_mock.MockerFixture, mock_endpoint):
-    with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find'):
-        with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
-                          return_value=mock_endpoint):
-            device = USBDevice(0x01, 0x02)
-            endpoint = device._device_endpoint_out
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find')
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
+                 return_value=None)
 
-            assert endpoint == mock_endpoint
+    device = USBDevice(0x01, 0x02)
+    endpoint = device._device_endpoint_out
+
+    assert endpoint == mock_endpoint
 
 
-def test__device_endpoint_out_no_endpoint_found(mocker: pytest_mock.MockerFixture):
-    with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find'):
-        with mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
-                          return_value=None):
-            device = USBDevice(0x01, 0x02)
+def test__device_endpoint_out_no_endpoint_found(mocker: pytest_mock.MockerFixture, mocked_usb_device):
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find')
+    mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
+                 return_value=None)
 
-            with pytest.raises(USBDeviceException) as wrapped_e:
-                _ = device._device_endpoint_out
+    with pytest.raises(USBDeviceException) as wrapped_e:
+        _ = mocked_usb_device._device_endpoint_out
 
-            assert 'could not get endpoint with direction OUT' in str(wrapped_e.value)
+    assert 'could not get endpoint with direction OUT' in str(wrapped_e.value)
 
 
 def test__device_endpoint_out_device_not_configured(mocked_usb_device):
@@ -256,8 +257,18 @@ def test__configure_device(mocker: pytest_mock.MockerFixture):
         new_callable=mocker.PropertyMock
     )
 
-    device = USBDevice(0x01, 0x02)
+    mocked_find_descriptor = mocker.patch(
+        'lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor'
+    )
 
+    mocked_max_package_size = mocker.patch(
+        'lightuptraining.sources.antplus.usbdevice.device.USBDevice._max_packet_size',
+        return_value=0x40
+    )
+
+    device = USBDevice(0x01, 0x02)
+    mocked_find_descriptor.assert_called()
+    mocked_max_package_size.assert_called_once()
     mocked_find.assert_called_once()
     mocked_detach_kernel.assert_called_once()
     mocked_claim_interface.assert_called_once()
