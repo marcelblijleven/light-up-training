@@ -87,7 +87,7 @@ def test__device_active_configuration_device_not_configured(mocked_usb_device):
 def test__device_endpoint_in(mocker: pytest_mock.MockerFixture, mock_endpoint):
     mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find')
     mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
-                 return_value=None)
+                 return_value=mock_endpoint)
 
     device = USBDevice(0x01, 0x02)
     endpoint = device._device_endpoint_in
@@ -118,7 +118,7 @@ def test__device_endpoint_in_device_not_configured(mocked_usb_device):
 def test__device_endpoint_out(mocker: pytest_mock.MockerFixture, mock_endpoint):
     mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.core.find')
     mocker.patch('lightuptraining.sources.antplus.usbdevice.device.usb.util.find_descriptor',
-                 return_value=None)
+                 return_value=mock_endpoint)
 
     device = USBDevice(0x01, 0x02)
     endpoint = device._device_endpoint_out
