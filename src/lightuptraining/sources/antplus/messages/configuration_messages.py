@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import struct
 from abc import ABC
-from typing import List, Tuple
+from typing import List, Tuple, Type
 
 from lightuptraining.sources.antplus.messages import const
 from lightuptraining.sources.antplus.messages.const import MESSAGE_OPEN_RX_SCAN_MODE, MESSAGE_RESET_SYSTEM
-from lightuptraining.sources.antplus.messages.message import AbstractMessage, MessageData
+from lightuptraining.sources.antplus.messages.message import AbstractMessage, MessageData, T
 from lightuptraining.sources.antplus.messages.util import (calculate_checksum, device_number_to_fields,
                                                            validate_device_number, validate_device_type,
-                                                           set_pairing_bit_on_device_type)
+                                                           set_pairing_bit_on_device_type, fields_to_device_number,
+                                                           split_pairing_bit_from_device_type)
 
 
 class ConfigurationMessage(AbstractMessage, ABC):
@@ -117,7 +118,7 @@ class EnableExtendedMessagesMessage(ConfigurationMessage):
     @classmethod
     def _from_message(cls, message: MessageData):
         content = message.content
-        return cls(*content)
+        return cls(bool(content[1]))
 
 
 class OpenChannelMessage(ConfigurationMessage):
@@ -150,9 +151,24 @@ class OpenRxScanModeMessage(ConfigurationMessage):
             self.content = [channel_number]
 
     @classmethod
+    def from_bytes(cls: Type[T], data: bytes) -> T:
+        if len(data) == 6:
+            cls.encoding_format = '<BBBBBB'
+
+        return super().from_bytes(data)
+
+
+    @classmethod
     def _from_message(cls, message: MessageData):
+        length = message.length
         content = message.content
-        return cls(*content)
+        channel_number = content[0]
+
+        if length == 2:
+            synchronous_packages_only = bool(content[1])
+            return cls(channel_number, synchronous_packages_only)
+
+        return cls(channel_number)
 
 
 class SystemResetMessage(ConfigurationMessage):
@@ -190,7 +206,7 @@ class SetChannelIdMessage(ConfigurationMessage):
         validate_device_type(device_type)
 
         device_number_fields = device_number_to_fields(device_number)
-        device_type_with_pairing_bit = set_pairing_bit_on_device_type(device_type, set_pairing_bit)
+        device_type_with_pairing_bit = set_pairing_bit_on_device_type(set_pairing_bit, device_type)
 
         self.channel_number = channel_number
         self.content = [channel_number, *device_number_fields, device_type_with_pairing_bit, transmission_type]
@@ -199,14 +215,10 @@ class SetChannelIdMessage(ConfigurationMessage):
     def _from_message(cls, message: MessageData):
         content = message.content
         channel_number = content[0]
-        device_number = (content[2] << 8) + content[1]  # LSB, so start with right most byte
-        # device type contains pairing bit
-        return cls(*content)
-
-
-cim = SetChannelIdMessage.from_bytes(b'\xa4\x05Q\x01\xe8\x03\xf8\n\xe8')
-print(cim.encode())
-print(cim.encode() == b'\xa4\x05Q\x01\xe8\x03\xf8\n\xe8')
+        device_number = fields_to_device_number((content[1], content[2]))
+        pairing_bit, device_type = split_pairing_bit_from_device_type(content[3])
+        transmission_type = content[4]
+        return cls(channel_number, device_number, device_type, transmission_type, bool(pairing_bit))
 
 
 class SetChannelPeriodMessage(ConfigurationMessage):
@@ -219,12 +231,15 @@ class SetChannelPeriodMessage(ConfigurationMessage):
     def __init__(self, channel_number: int, channel_period: int):
         self.channel_number = channel_number
         content = bytearray([channel_number, ])
-        content[1:3] = struct.pack("<H", channel_period)
+        content[1:3] = struct.pack('<H', channel_period)
         self.content = [byte for byte in content]
 
     @classmethod
     def _from_message(cls, message: MessageData):
-        pass
+        content = message.content
+        channel_number = content[0]
+        channel_period = struct.unpack('<H', bytes(content[1:3]))[0]
+        return cls(channel_number, channel_period)
 
 
 class SetSearchTimeoutMessage(ConfigurationMessage):
@@ -240,7 +255,10 @@ class SetSearchTimeoutMessage(ConfigurationMessage):
 
     @classmethod
     def _from_message(cls, message: MessageData):
-        pass
+        content = message.content
+        channel_number = content[0]
+        timeout = content[1]
+        return cls(channel_number, timeout)
 
 
 class SetNetworkKeyMessage(ConfigurationMessage):
@@ -256,7 +274,10 @@ class SetNetworkKeyMessage(ConfigurationMessage):
 
     @classmethod
     def _from_message(cls, message: MessageData):
-        pass
+        content = message.content
+        channel_number = content[0]
+        network_key = list(content[1:])
+        return cls(channel_number, network_key)
 
 
 class SetRfFrequencyMessage(ConfigurationMessage):
@@ -272,7 +293,10 @@ class SetRfFrequencyMessage(ConfigurationMessage):
 
     @classmethod
     def _from_message(cls, message: MessageData):
-        pass
+        content = message.content
+        channel_number = content[0]
+        rf_frequency = content[1]
+        return cls(channel_number, rf_frequency)
 
 
 class SetTransmissionPowerMessage(ConfigurationMessage):
@@ -291,4 +315,7 @@ class SetTransmissionPowerMessage(ConfigurationMessage):
 
     @classmethod
     def _from_message(cls, message: MessageData):
-        pass
+        content = message.content
+        channel_number = content[0]
+        transmit_power = content[1]
+        return cls(channel_number, transmit_power)

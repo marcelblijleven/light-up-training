@@ -34,7 +34,7 @@ def device_number_to_fields(device_number: int) -> List[int]:
     return [byte for byte in struct.pack('<H', device_number)]
 
 
-def fields_to_device_number(fields: Union[Tuple[int], List[int]]) -> int:
+def fields_to_device_number(fields: Union[Tuple[int, int], List[int]]) -> int:
     """
     Joins the two 8 bit fields into a 16 bit device number
 
