@@ -1,7 +1,7 @@
 import struct
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Type, TypeVar, Tuple
+from typing import Type, TypeVar, Tuple, Iterator, Iterable
 
 from lightuptraining.sources.antplus.messages.util import calculate_checksum
 
@@ -18,7 +18,7 @@ class MessageData:
     sync: int
     length: int
     message_id: int
-    content: Tuple[int]
+    content: Tuple[int, ...]
     checksum: int
 
 
@@ -54,7 +54,7 @@ class AbstractMessage(ABC):
         sync_byte = values[0]
         message_length = values[1]
         message_id = values[2]
-        content = values[3:-1]
+        content = tuple([int(value) for value in values[3:-1]])
         checksum = values[-1]
 
         message = [sync_byte, message_length, message_id, *content]
@@ -66,6 +66,23 @@ class AbstractMessage(ABC):
         if not checksum == calculate_checksum(message):
             raise ValueError(f'checksum did not match for message {cls.__name__}')
 
+        if not message_length == len(content):
+            raise ValueError(f'content length did not match for message {cls.__name__}')
+
         message_data = MessageData(sync_byte, message_length, message_id, content, checksum)
 
         return cls._from_message(message_data)
+
+    @classmethod
+    def from_iterable(cls: Type[T], iterable: Iterable[int]) -> T:
+        """
+        Converts the iterable to bytes and calls the from_bytes method
+
+        Using the class field encoding_format, this method will unpack the provided bytes
+        into a Tuple of ints.
+
+        The contents of the message are used to calculate a checksum, which is then compared to
+        the provided checksum to validate the message. If the message is valid, an instance of the class
+        will be returned. If not, a ValueError is raised.
+        """
+        return cls.from_bytes(bytes(iterable))
