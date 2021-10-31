@@ -1,12 +1,11 @@
 import struct
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Type, TypeVar, Tuple, Iterator, Iterable
+from typing import Type, TypeVar, Tuple, Iterable
 
 from lightuptraining.sources.antplus.messages.util import calculate_checksum
 
-# This makes it possible to have type hinting for classmethods of child instances
-# of the AbstractMessage
+
 T = TypeVar('T', bound='AbstractMessage')
 
 
