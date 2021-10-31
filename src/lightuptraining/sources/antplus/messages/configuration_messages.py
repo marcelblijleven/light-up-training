@@ -152,11 +152,33 @@ class OpenRxScanModeMessage(ConfigurationMessage):
 
     @classmethod
     def from_bytes(cls: Type[T], data: bytes) -> T:
+        encoding_format = cls.encoding_format
+
         if len(data) == 6:
-            cls.encoding_format = '<BBBBBB'
+            encoding_format = '<BBBBBB'
 
-        return super().from_bytes(data)
+        values = struct.unpack(encoding_format, data)
 
+        sync_byte = values[0]
+        message_length = values[1]
+        message_id = values[2]
+        content = tuple([int(value) for value in values[3:-1]])
+        checksum = values[-1]
+
+        message = [sync_byte, message_length, message_id, *content]
+
+        if not message_id == cls.message_id:
+            raise ValueError(
+                f'message id did not match for message {cls.__name__}, got {message} expected {cls.message_id}')
+
+        if not checksum == calculate_checksum(message):
+            raise ValueError(f'checksum did not match for message {cls.__name__}')
+
+        if not message_length == len(content):
+            raise ValueError(f'content length did not match for message {cls.__name__}')
+
+        message_data = MessageData(sync_byte, message_length, message_id, content, checksum)
+        return cls._from_message(message_data)
 
     @classmethod
     def _from_message(cls, message: MessageData):
